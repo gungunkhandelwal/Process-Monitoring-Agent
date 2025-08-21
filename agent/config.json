@@ -1,0 +1,7 @@
+{
+  "api_url": "http://localhost:8000/api",
+  "api_key": "your-secret-api-key-here",
+  "collection_interval": 60,
+  "include_system_processes": true,
+  "max_processes": 1000
+}
