@@ -104,22 +104,20 @@ The agent uses `config.json` for configuration:
 
 ### Frontend Features
 
-- **Process Tree**: Hierarchical view of running processes
-- **Real-time Updates**: Auto-refresh capability
+- **Process Tree**: Subprocess view of running processes
 - **Search**: Filter processes by name, PID, or command line
-- **Process Details**: Click any process for detailed information
 - **Host Management**: Support for multiple monitored machines
 
 ## API Endpoints
 
 ### Agent Endpoints
-- `POST /api/submit/` - Submit process data (requires API key)
+- `POST /api/submit/` - Submit process data
 
 ### Frontend Endpoints
 - `GET /api/hosts/` - List all monitored hosts
-- `GET /api/hosts/{hostname}/processes/` - Get process tree for a host
+- `GET /api/hosts/{hostname}/processes/` - Get process for a host
 - `GET /api/hosts/{hostname}/snapshots/` - Get process snapshots for a host
-- `GET /api/status/` - System status information
+- `GET /api/status/` - System status info
 
 ## Data Collection
 
