@@ -9,9 +9,6 @@ class Host(models.Model):
     
     def __str__(self):
         return self.hostname
-    
-    # class Meta:
-    #     db_table = 'hosts'
 
 class SystemSnapshot(models.Model):
     host = models.ForeignKey(Host, on_delete=models.CASCADE, related_name='system_snapshots')
@@ -43,7 +40,6 @@ class ProcessSnapshot(models.Model):
         return f"{self.host.hostname} - {self.timestamp}"
     
     class Meta:
-        # db_table = 'process_snapshots'
         ordering = ['-timestamp']
 
 class Process(models.Model):
@@ -63,7 +59,6 @@ class Process(models.Model):
         return f"{self.name} (PID - {self.pid})"
     
     class Meta:
-        # db_table = 'processes'
         indexes = [
             models.Index(fields=['pid']),
             models.Index(fields=['parent_pid']),
@@ -90,5 +85,3 @@ class APIKey(models.Model):
     def __str__(self):
         return f"{self.name} - {self.key[:8]}..."
     
-    # class Meta:
-    #     db_table = 'api_keys'
