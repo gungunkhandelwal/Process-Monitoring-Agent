@@ -26,6 +26,12 @@ Collection            Storage           Visualization
 - Windows machine for the agent
 - Modern web browser for the frontend
 
+## Clone the Repository
+
+```bash
+git clone https://github.com/gungunkhandelwal/Process-Monitoring-Agent.git
+```
+
 ## Quick Start
 
 ### 1. One-Command Setup
@@ -149,4 +155,3 @@ Cyethack/
 ├── requirements.txt      
 ├── quick_start.py        
 └── build_agent.py        
-```
