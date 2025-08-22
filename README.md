@@ -56,13 +56,10 @@ The backend will be available at `http://localhost:8000`
 ### 2. Agent Setup
 
 ```bash
-# Navigate to agent directory
 cd agent
 
-# Install agent dependencies
 pip install -r requirments.txt
 
-# Run continuously
 python system_monitor_agent.py
 ```
 

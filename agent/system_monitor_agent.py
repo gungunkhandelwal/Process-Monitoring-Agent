@@ -20,8 +20,33 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+def get_cpu_brand():
+    system = platform.system()
+    try:
+        if system == "Darwin":
+            import subprocess
+            result = subprocess.run(['sysctl', '-n', 'machdep.cpu.brand_string'],
+                                   capture_output=True, text=True, timeout=5)
+            if result.returncode == 0:
+                return result.stdout.strip()
+        elif system == "Linux":
+            with open('/proc/cpuinfo', 'r') as f:
+                for line in f:
+                    if line.startswith('model name'):
+                        return line.split(':')[1].strip()
+        elif system == "Windows":
+            import subprocess
+            result = subprocess.run(['wmic', 'cpu', 'get', 'name'],
+                                   capture_output=True, text=True, timeout=5)
+            if result.returncode == 0:
+                lines = result.stdout.strip().split('\n')
+                if len(lines) > 1:
+                    return lines[1].strip()
+    except Exception as e:
+        logger.warning(f"Could not get CPU brand: {e}")
+    return platform.processor() or f"{system} CPU"
+
 class SystemMonitorAgent:
-    # Configuration
     def __init__(self, config_file: str = 'config.json'):
         self.config = self.load_config(config_file)
         self.api_url = self.config.get('api_url', 'http://localhost:8000/api')
@@ -47,15 +72,12 @@ class SystemMonitorAgent:
         return default_config
     
     def collect_system_data(self) -> Dict[str, Any]:
-        '''Collect System Information'''
         cpu_count = psutil.cpu_count()
         cpu_count_logical = psutil.cpu_count(logical=True)
-        cpu_percent = psutil.cpu_percent(interval=1)
         memory = psutil.virtual_memory()
         memory_total_gb = memory.total / (1024**3)
         memory_used_gb = memory.used / (1024**3)
         memory_available_gb = memory.available / (1024**3)
-        memory_percent = memory.percent
         try:
             disk = psutil.disk_usage('/')
             disk_total_gb = disk.total / (1024**3)
@@ -66,11 +88,7 @@ class SystemMonitorAgent:
         platform_system = platform.system()
         platform_release = platform.release()
         platform_version = platform.version()
-        cpu_brand = "Unknown"
-        if hasattr(psutil, 'cpu_info'):
-            cpu_info = psutil.cpu_info()
-            if hasattr(cpu_info, 'brand'):
-                cpu_brand = cpu_info.brand
+        cpu_brand = get_cpu_brand()
         return {
             'operating_system': f"{platform_system}-{platform_release}-{platform_version}",
             'processor': cpu_brand,
@@ -85,22 +103,23 @@ class SystemMonitorAgent:
         }
 
     def collect_process_data(self) -> List[Dict[str, Any]]:
-        ''' Collect process info'''
         processes = []
-        for proc in psutil.process_iter(['pid', 'name', 'ppid', 'cpu_percent', 'memory_percent', 
-                                         'memory_info', 'status', 'username', 'cmdline', 'create_time']):
+        process_list = list(psutil.process_iter(['pid', 'name', 'ppid', 'status', 'username', 'cmdline', 'create_time']))
+        cpu_usage = self._get_cpu_usage(process_list)
+        for proc in process_list:
             try:
                 proc_info = proc.info
                 if not all(key in proc_info for key in ['pid', 'name']):
                     continue
-                memory_mb = 0
-                if proc_info['memory_info']:
-                    memory_mb = proc_info['memory_info'].rss / (1024 * 1024)
-                
-                # Ensure memory_mb is a valid number
-                if memory_mb is None or not isinstance(memory_mb, (int, float)):
-                    memory_mb = 0.0
-                
+                cpu_percent = cpu_usage.get(proc_info['pid'], 0.0)
+                try:
+                    proc_obj = psutil.Process(proc_info['pid'])
+                    memory_info = proc_obj.memory_info()
+                    memory_percent = proc_obj.memory_percent()
+                except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+                    memory_info = None
+                    memory_percent = 0.0
+                memory_mb = memory_info.rss / (1024 * 1024) if memory_info else 0.0
                 cmdline = proc_info.get('cmdline', [])
                 command_line = ' '.join(cmdline) if cmdline else proc_info['name']
                 if len(command_line) > 500:
@@ -108,19 +127,10 @@ class SystemMonitorAgent:
                 username = proc_info.get('username', 'Unknown')
                 if username and len(username) > 100:
                     username = username[:100]
-                cpu_percent = proc_info.get('cpu_percent', 0.0)
-                memory_percent = proc_info.get('memory_percent', 0.0)
-                
-                # Handle None values for cpu_percent and memory_percent
-                if cpu_percent is None:
-                    cpu_percent = 0.0
-                if memory_percent is None:
-                    memory_percent = 0.0
-                
                 process_data = {
                     'pid': proc_info['pid'],
                     'name': proc_info['name'][:255],
-                    'parent_pid': proc_info.get('ppid') if proc_info.get('ppid') is not None else None,
+                    'parent_pid': proc_info.get('ppid'),
                     'cpu_percent': round(float(cpu_percent), 2),
                     'memory_percent': round(float(memory_percent), 2),
                     'memory_mb': round(memory_mb, 2),
@@ -133,10 +143,36 @@ class SystemMonitorAgent:
             except Exception as e:
                 logger.warning(f"Error processing process {getattr(proc, 'pid', '?')}: {e}")
                 continue
+        logger.info(f"Collected data for {len(processes)} processes")
         return processes
 
+    def _get_cpu_usage(self, process_list: List[psutil.Process]) -> Dict[int, float]:
+        cpu_usage = {}
+        try:
+            initial_times = {}
+            for proc in process_list:
+                try:
+                    cpu_times = proc.cpu_times()
+                    initial_times[proc.pid] = cpu_times.user + cpu_times.system
+                except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+                    initial_times[proc.pid] = 0.0
+            time.sleep(0.1)
+            for proc in process_list:
+                try:
+                    cpu_times = proc.cpu_times()
+                    current_time = cpu_times.user + cpu_times.system
+                    initial_time = initial_times.get(proc.pid, 0.0)
+                    time_diff = current_time - initial_time
+                    cpu_percent = (time_diff / 0.1) * 100
+                    cpu_percent = max(0.0, min(100.0, cpu_percent))
+                    cpu_usage[proc.pid] = cpu_percent
+                except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+                    cpu_usage[proc.pid] = 0.0
+        except Exception as e:
+            logger.warning(f"Error getting CPU usage: {e}")
+        return cpu_usage
+
     def send_data_to_backend(self, system_data: Dict[str, Any], process_data: List[Dict[str, Any]]) -> bool:
-        '''Send data to Backend'''
         payload = {
             'hostname': self.hostname,
             'timestamp': datetime.now().isoformat(),
@@ -160,7 +196,6 @@ class SystemMonitorAgent:
             return False
 
     def run_once(self) -> bool:
-        '''Run the data'''
         logger.info("Starting data collection...")
         system_data = self.collect_system_data()
         process_data = self.collect_process_data()
