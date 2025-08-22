@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Process Monitor Dashboard</title>
+    <link rel="stylesheet" href="{% load static %}{% static 'css/style.css' %}">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1><i class="fas fa-desktop"></i> Process Monitor Dashboard</h1>
+            <div class="system-status">
+                <span class="status-indicator" id="statusIndicator"></span>
+                <span id="statusText">Connecting...</span>
+            </div>
+        </header>
+
+        <div class="main-content">
+            <div class="sidebar">
+                <div class="host-selector">
+                    <label for="hostSelect">Select Host:</label>
+                    <select id="hostSelect" onchange="loadHostData()">
+                        <option value="">Loading hosts...</option>
+                    </select>
+                </div>
+                
+                <div class="host-list" id="hostList">
+                </div>
+            </div>
+
+            <!-- Right Content Area -->
+            <div class="content-area">
+                <div class="tab-navigation">
+                    <div class="tab" id="systemTab" onclick="showSystemDetails()">
+                        <i class="fas fa-server"></i> System Details
+                    </div>
+                    <div class="tab" id="processTab" onclick="showProcessDetails()">
+                        <i class="fas fa-list"></i> Processes Details
+                    </div>
+                </div>
+
+                <!-- System Details Tab -->
+                <div class="tab-content" id="systemDetails">
+                    <div class="tab-header">
+                        <h2>System Information</h2>
+                    </div>
+                    
+                    <div class="system-info-table" id="systemInfoTable">
+                        <div class="loading">
+                            <i class="fas fa-spinner fa-spin"></i>
+                            <p>Select a host to view system information</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Process Details Tab -->
+                <div class="tab-content" id="processDetails" style="display: none;">
+                    <div class="tab-header">
+                        <h2>Process Information</h2>
+                        <div class="process-controls">
+                            <div class="search-box">
+                                <i class="fas fa-search"></i>
+                                <input type="text" id="searchInput" placeholder="Search processes..." onkeyup="filterProcesses()">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="process-table-container">
+                        <table class="process-table" id="processTable">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Memory Usage (MB)</th>
+                                    <th>CPU Usage (%)</th>
+                                    <th>PPID</th>
+                                    <th>Status</th>
+                                    <th>Username</th>
+                                    <th>Command Line</th>
+                                    <th>Created Time</th>
+                                </tr>
+                            </thead>
+                            <tbody id="processTableBody">
+                                <tr>
+                                    <td colspan="8" class="loading">
+                                        <i class="fas fa-spinner fa-spin"></i>
+                                        <p>Select a host to view processes</p>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Process Details Modal -->
+    <div class="modal" id="processModal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal()">&times;</span>
+            <h2>Process Details</h2>
+            <div id="processDetails"></div>
+        </div>
+    </div>
+
+    <script src="{% static 'js/script.js' %}"></script>
+</body>
+</html>
